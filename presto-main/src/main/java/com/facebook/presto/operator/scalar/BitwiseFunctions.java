@@ -19,6 +19,8 @@ import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
 
+import java.math.BigInteger;
+
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 
 public final class BitwiseFunctions
@@ -74,5 +76,96 @@ public final class BitwiseFunctions
     public static long bitwiseXor(@SqlType(StandardTypes.BIGINT) long left, @SqlType(StandardTypes.BIGINT) long right)
     {
         return left ^ right;
+    }
+
+    @Description("default BIGINT logical left shift operation")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSll(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift)
+    {
+        return number << shift;
+    }
+
+    @Description("logical left shift operation with specified bits")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSll(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift,
+            @SqlType(StandardTypes.BIGINT) long bits)
+    {
+        if (bits == 64) {
+            return bitwiseSll(number, shift);
+        }
+
+        if (bits <= 1 || bits > 64) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Bits specified in bit_count must be between 2 and 64, got " + bits);
+        }
+
+        if (shift < 0) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Specified shift must be positive");
+        }
+
+        return (number << shift) & (long) (Math.pow(2, bits) - 1);
+    }
+
+    @Description("default BIGINT logical right shift operation")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSrl(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift)
+    {
+        return number >>> shift;
+    }
+
+    @Description("logical right shift operation with specified bits")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSrl(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift,
+            @SqlType(StandardTypes.BIGINT) long bits)
+    {
+        if (bits == 64) {
+            return bitwiseSrl(number, shift);
+        }
+
+        if (bits <= 1 || bits > 64) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Bits specified in bit_count must be between 2 and 64, got " + bits);
+        }
+
+        if (shift < 0) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Specified shift must be positive");
+        }
+
+        number = number << (64 - bits);
+
+        return (number >>> (64 - bits + shift)) & (long) (Math.pow(2, bits) - 1);
+    }
+
+    @Description("default BIGINT arithmetic right shift operation")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSra(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift)
+    {
+        return number >> shift;
+    }
+
+    @Description("arithmetic right shift operation with specified bits")
+    @ScalarFunction
+    @SqlType(StandardTypes.BIGINT)
+    public static long bitwiseSra(@SqlType(StandardTypes.BIGINT) long number, @SqlType(StandardTypes.BIGINT) long shift,
+            @SqlType(StandardTypes.BIGINT) long bits)
+    {
+        if (bits == 64) {
+            return bitwiseSra(number, shift);
+        }
+
+        if (bits <= 1 || bits > 64) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Bits specified in bit_count must be between 2 and 64, got " + bits);
+        }
+
+        if (shift < 0) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Specified shift must be positive");
+        }
+
+        number = number << (64 - bits);
+
+        return (number >> (64 - bits + shift)) & (long) (Math.pow(2, bits) - 1);
     }
 }

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.scalar;
 
+import com.facebook.presto.spi.PrestoException;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -89,5 +90,45 @@ public class TestBitwiseFunctions
         assertFunction("bitwise_xor(3, 8)", BIGINT, 3L ^ 8L);
         assertFunction("bitwise_xor(-4, 12)", BIGINT, -4L ^ 12L);
         assertFunction("bitwise_xor(60, 21)", BIGINT, 60L ^ 21L);
+    }
+
+    @Test
+    public void testBitwiseSll()
+    {
+        assertFunction("bitwise_sll(7, 2, 4)", BIGINT, 12L);
+        assertFunction("bitwise_sll(7, 2)", BIGINT, 7L << 2L);
+        assertInvalidFunction("bitwise_sll(7, -3");
+        assertFunction("bitwise_sll(-4, 6)", BIGINT, -4L << 6L);
+        assertFunction("bitwise_sll(-4, 6, 5)", BIGINT, 0L);
+        assertFunction("bitwise_sll(-4, 6, 9)", BIGINT, 256L);
+    }
+
+    @Test
+    public void testBitwiseSrl()
+    {
+        assertFunction("bitwise_srl(7, 2, 4)", BIGINT, 1L);
+        assertFunction("bitwise_srl(7, 2)", BIGINT, 7L >>> 2L);
+        assertInvalidFunction("bitwise_srl(7, -3");
+        assertFunction("bitwise_srl(-4, 6)", BIGINT, -4L >>> 6L);
+        assertFunction("bitwise_srl(-8, 2, 5)", BIGINT, 6L);
+        //-1152905011916701696 = 0xF0000F0000F00000
+        assertFunction("bitwise_srl(-1152905011916701696, 62)", BIGINT, 3L);
+        assertFunction("bitwise_srl(-1152905011916701696, 62, 4)", BIGINT, 0L);
+        assertFunction("bitwise_srl(-1152905011916701696, 1, 4)", BIGINT, 0L);
+    }
+
+    @Test
+    public void testBitwiseSra()
+    {
+        assertFunction("bitwise_sra(7, 2, 4)", BIGINT, 1L);
+        assertFunction("bitwise_sra(7, 2)", BIGINT, 7L >> 2L);
+        assertInvalidFunction("bitwise_sra(7, -3");
+        assertFunction("bitwise_sra(-4, 6)", BIGINT, -4L >> 6L);
+        assertFunction("bitwise_sra(-256, 3, 5)", BIGINT, 0L);
+        assertFunction("bitwise_sra(-256, 3, 12)", BIGINT, -32L);
+        //-1152905011916701696 = 0xF0000F0000F00000
+        assertFunction("bitwise_sra(-1152905011916701696, 62)", BIGINT, -1L);
+        assertFunction("bitwise_sra(-1152905011916701696, 62, 4)", BIGINT, 0L);
+        assertFunction("bitwise_sra(-1152905011916701696, 1, 4)", BIGINT, 0L);
     }
 }
