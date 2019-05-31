@@ -25,6 +25,7 @@ import com.facebook.presto.spi.function.TypeParameter;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic;
+import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.LiteralParameter;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
@@ -202,19 +203,14 @@ public final class BitwiseFunctions
 
         @LiteralParameters({"p", "s"})
         @SqlType("decimal(p, s)")
-        public static long srlShort(@LiteralParameter("s") long numScale,
-                @LiteralParameter("p") long resultPrecision,
-                @SqlType("decimal(p, s)") long number, @SqlType(StandardTypes.INTEGER) int shift)
+        public static long srlShort(@SqlType("decimal(p, s)") long number, @SqlType(StandardTypes.INTEGER) long shift)
         {
             return bitwiseSrl(number, shift);
         }
 
         @LiteralParameters({"p", "s"})
         @SqlType("decimal(p, s)")
-        public static Slice srlLong(@LiteralParameter("s") long numScale,
-                @LiteralParameter("p") long resultPrecision,
-                @SqlType("decimal(p, s)") Slice number,
-                @SqlType(StandardTypes.INTEGER) int shift)
+        public static Slice srlLong(@SqlType("decimal(p, s)") Slice number, @SqlType(StandardTypes.INTEGER) long shift)
         {
             long high = number.getLong(0);
             long low = number.getLong(8);
@@ -229,23 +225,20 @@ public final class BitwiseFunctions
             low = low >>> shift;
             low = low | highShift;
             high = high >>> shift;
-            System.out.println(high);
-            System.out.println(low);
 
             SliceOutput sliceOutput = new DynamicSliceOutput(16);
             sliceOutput.writeLong(high);
             sliceOutput.writeLong(low);
 
             return sliceOutput.slice();
-
         }
     }
 
     @Description("default DECIMAL arithmetic right shift operation")
-    @ScalarFunction("bitwise_decimal_sra")
+    @ScalarFunction("bitwise_decimal_sra_l")
     @LiteralParameters({"p", "s"})
     @SqlType("decimal(p, s)")
-    public static Slice bitwiseDecimalSra(@SqlType("decimal(p, s)") Slice number,
+    public static Slice bitwiseDecimalSraL(@SqlType("decimal(p, s)") Slice number,
             @SqlType(StandardTypes.INTEGER) int shift)
     {
         BigInteger decimal = UnscaledDecimal128Arithmetic.unscaledDecimalToBigInteger(number);
@@ -253,31 +246,42 @@ public final class BitwiseFunctions
         return UnscaledDecimal128Arithmetic.unscaledDecimal(decimal);
     }
 
-    @Description("default DECIMAL arithmetic right shift operation")
     @ScalarFunction("bitwise_decimal_sra")
-    @LiteralParameters({"p", "s"})
-    @SqlType("decimal(p, s)")
-    public static Slice sraLong(@SqlType("decimal(p, s)") Slice number,
-            @SqlType(StandardTypes.INTEGER) int shift)
+    @Description("default DECIMAL logical right shift operation for ShortDecimalType")
+    public static final class bitwiseDecimalSra
     {
-        long high = number.getLong(0);
-        long low = number.getLong(8);
-        long highShift;
+        private bitwiseDecimalSra() {}
 
-        if (shift > 64) {
-            highShift = high >>> (shift - 64);
-        } else {
-            highShift = high << (64 - shift);
+        @LiteralParameters({"p", "s"})
+        @SqlType("decimal(p, s)")
+        public static long sraShort(@SqlType("decimal(p, s)") long number, @SqlType(StandardTypes.INTEGER) long shift)
+        {
+            return bitwiseSra(number, shift);
         }
 
-        low = low >>> shift;
-        low = low | highShift;
-        high = high >> shift;
+        @LiteralParameters({"p", "s"})
+        @SqlType("decimal(p, s)")
+        public static Slice sraLong(@SqlType("decimal(p, s)") Slice number, @SqlType(StandardTypes.INTEGER) long shift)
+        {
+            long high = number.getLong(0);
+            long low = number.getLong(8);
+            long highShift;
 
-        SliceOutput sliceOutput = new DynamicSliceOutput(16);
-        sliceOutput.writeLong(high);
-        sliceOutput.writeLong(low);
+            if (shift > 64) {
+                highShift = high >>> (shift - 64);
+            } else {
+                highShift = high << (64 - shift);
+            }
 
-        return sliceOutput.slice();
+            low = low >>> shift;
+            low = low | highShift;
+            high = high >> shift;
+
+            SliceOutput sliceOutput = new DynamicSliceOutput(16);
+            sliceOutput.writeLong(high);
+            sliceOutput.writeLong(low);
+
+            return sliceOutput.slice();
+        }
     }
 }

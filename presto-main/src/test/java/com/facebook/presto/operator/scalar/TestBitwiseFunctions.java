@@ -153,15 +153,29 @@ public class TestBitwiseFunctions
     }
 
     @Test
+    public void testBitwiseDecimalSrl()
+    {
+        assertDecimalFunction("bitwise_decimal_srl(DECIMAL '7', 2)", decimal("1"));
+        assertFunction("bitwise_decimal_srl(DECIMAL '-7', 2)", createDecimalType(19, 0), SqlDecimal.of("4611686018427387902", 19, 0));
+     //   assertDecimalFunction("bitwise_decimal_srl(DECIMAL '-7', 2)", decimal("85070591730234615865843651857942052862"));
+    }
+
+    @Test
     public void testBitwiseDecimalSra()
     {
-        //assertDecimalFunction("DECIMAL '107.7'", decimal("107.7"));
-       // assertDecimalFunction("bitwise_decimal_srl(DECIMAL '7', 2)", decimal("1"));
 
+        assertDecimalFunction("bitwise_decimal_sra(DECIMAL '7', 2)", decimal("1"));
+        assertDecimalFunction("bitwise_decimal_sra(DECIMAL '-7', 2)", decimal("-2"));
+        assertFunction("bitwise_decimal_sra(DECIMAL '8', 2)", createDecimalType(2, 0), SqlDecimal.of("2", 1, 0));
 
+        BigInteger x = new BigInteger("-7");
+        x = x.shiftRight(2);
+        System.out.println(x.toString());
+
+        /*
         SliceOutput sliceOutput = new DynamicSliceOutput(16);
-      //  sliceOutput.writeLong(0);
-        byte[] bytes =  {-1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 7};
+    //  sliceOutput.writeLong(0);
+          byte[] bytes =  {-1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 7};
         BigInteger x = new BigInteger("-18446744073709551609");
         byte[] xArr = x.toByteArray();
       //  Slice x = UnscaledDecimal128Arithmetic.unscaledDecimal("-18446744073709551609");
@@ -181,15 +195,15 @@ public class TestBitwiseFunctions
      //   sliceOutputCompare.writeLong(new Long("40000000000000"));
         Slice y = sliceOutputCompare.slice();
 
-        Slice a = BitwiseFunctions.bitwiseDecimalSra(sliceOutputTest.slice(), 2);
-        Slice b = BitwiseFunctions.sraLong(sliceOutputCompare.slice(), 2);
-        System.out.println(BitwiseFunctions.bitwiseDecimalSra(sliceOutputTest.slice(), 2).getLong(0));
-        System.out.println(BitwiseFunctions.bitwiseDecimalSra(sliceOutputTest.slice(), 2).getLong(1));
-        System.out.println(BitwiseFunctions.sraLong(sliceOutputCompare.slice(), 2).getLong(0));
-        System.out.println(BitwiseFunctions.sraLong(sliceOutputCompare.slice(), 2).getLong(8));
+        Slice a = BitwiseFunctions.bitwiseDecimalSraL(sliceOutputTest.slice(), 2);
+        Slice b = BitwiseFunctions.bitwiseDecimalSra.sraLong(sliceOutputCompare.slice(), 2);
+        System.out.println(BitwiseFunctions.bitwiseDecimalSraL(sliceOutputTest.slice(), 2).getLong(0));
+        System.out.println(BitwiseFunctions.bitwiseDecimalSraL(sliceOutputTest.slice(), 2).getLong(1));
+        System.out.println(BitwiseFunctions.bitwiseDecimalSra.sraLong(sliceOutputCompare.slice(), 2).getLong(0));
+        System.out.println(BitwiseFunctions.bitwiseDecimalSra.sraLong(sliceOutputCompare.slice(), 2).getLong(8));
         //System.out.println(7 >> 2);
 
-/*
+
       //  assertFunction("bitwise_decimal_sra(CAST(INTEGER '234' AS DECIMAL(4, 1)), CAST (INTEGER '2' AS BIGINT))", DecimalType.createDecimalType(), decimal("28"));
         assertFunction("bitwise_sra(7, 2)", BIGINT, 7L >> 2L);
         assertFunction("bitwise_sra(-4, 6)", BIGINT, -4L >> 6L);
