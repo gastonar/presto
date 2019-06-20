@@ -18,25 +18,25 @@ import com.facebook.presto.operator.aggregation.state.StatisticalDigestState;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.function.InputFunction;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.StatisticalQuantileDigest;
-import io.airlift.stats.QuantileDigest;
+import com.facebook.presto.tdigest.TDigest;
+import com.facebook.presto.type.StatisticalTDigest;
 
-import static com.facebook.presto.spi.type.StandardTypes.QDIGEST;
+import static com.facebook.presto.spi.type.StandardTypes.TDIGEST;
 
-public class MergeQuantileDigestFunction
+public class MergeTDigestFunction
         extends AbstractMergeStatisticalDigestFunction
 {
-    public static final MergeQuantileDigestFunction MERGE = new MergeQuantileDigestFunction();
+    public static final MergeTDigestFunction MERGE = new MergeTDigestFunction();
     public static final String NAME = "merge";
 
-    public MergeQuantileDigestFunction()
+    public MergeTDigestFunction()
     {
-        super(NAME, QDIGEST, false);
+        super(NAME, TDIGEST, true);
     }
 
     @InputFunction
     public static void input(Type type, StatisticalDigestState state, Block value, int index)
     {
-        merge(state, new StatisticalQuantileDigest(new QuantileDigest(type.getSlice(value, index))));
+        merge(state, new StatisticalTDigest(new TDigest(type.getSlice(value, index))));
     }
 }
