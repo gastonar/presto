@@ -38,6 +38,7 @@ import com.facebook.presto.metadata.SqlAggregationFunction;
 import com.facebook.presto.operator.aggregation.state.TDigestState;
 import com.facebook.presto.operator.aggregation.state.TDigestStateFactory;
 import com.facebook.presto.operator.aggregation.state.TDigestStateSerializer;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.TDigestType;
@@ -60,6 +61,8 @@ import static com.facebook.presto.operator.aggregation.AggregationUtils.generate
 import static com.facebook.presto.operator.scalar.TDigestFunctions.DEFAULT_COMPRESSION;
 import static com.facebook.presto.operator.scalar.TDigestFunctions.DEFAULT_WEIGHT;
 import static com.facebook.presto.operator.scalar.TDigestFunctions.verifyTDigestParameter;
+import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.function.Signature.comparableTypeParameter;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
@@ -143,7 +146,7 @@ public final class TDigestAggregationFunction
                 // weight and compression specified
                 return ImmutableList.of(valueType, BIGINT, DOUBLE);
             default:
-                throw new IllegalArgumentException(format("Unsupported number of arguments: %s", arity));
+                throw new PrestoException(INVALID_FUNCTION_ARGUMENT, format("Unsupported number of arguments: %s", arity));
         }
     }
 
@@ -155,7 +158,7 @@ public final class TDigestAggregationFunction
                 inputFunction = INPUT_DOUBLE;
                 break;
             default:
-                throw new IllegalArgumentException(format("Unsupported type %s supplied", valueType.getDisplayName()));
+                throw new PrestoException(NOT_SUPPORTED, format("Unsupported type %s supplied", valueType.getDisplayName()));
         }
 
         switch (arity) {
@@ -169,7 +172,7 @@ public final class TDigestAggregationFunction
                 // weight and compression specified
                 return inputFunction;
             default:
-                throw new IllegalArgumentException(format("Unsupported number of arguments: %s", arity));
+                throw new PrestoException(INVALID_FUNCTION_ARGUMENT, format("Unsupported number of arguments: %s", arity));
         }
     }
 
