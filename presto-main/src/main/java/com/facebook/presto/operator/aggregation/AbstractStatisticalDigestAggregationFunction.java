@@ -13,22 +13,21 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.bytecode.DynamicClassLoader;
 import com.facebook.presto.metadata.BoundVariables;
 import com.facebook.presto.metadata.FunctionManager;
 import com.facebook.presto.metadata.SqlAggregationFunction;
-import com.facebook.presto.operator.aggregation.state.QuantileDigestState;
-import com.facebook.presto.operator.aggregation.state.QuantileDigestStateFactory;
-import com.facebook.presto.operator.aggregation.state.QuantileDigestStateSerializer;
+import com.facebook.presto.operator.aggregation.state.StatisticalDigestState;
+import com.facebook.presto.operator.aggregation.state.StatisticalDigestStateFactory;
+import com.facebook.presto.operator.aggregation.state.StatisticalDigestStateSerializer;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.type.QuantileDigestType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.google.common.collect.ImmutableList;
-import io.airlift.stats.QuantileDigest;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
@@ -39,83 +38,89 @@ import static com.facebook.presto.operator.aggregation.AggregationMetadata.Param
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.INPUT_CHANNEL;
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
 import static com.facebook.presto.operator.aggregation.AggregationUtils.generateAggregationName;
-import static com.facebook.presto.operator.aggregation.FloatingPointBitsConverterUtil.doubleToSortableLong;
-import static com.facebook.presto.operator.aggregation.FloatingPointBitsConverterUtil.floatToSortableInt;
 import static com.facebook.presto.operator.scalar.QuantileDigestFunctions.DEFAULT_ACCURACY;
 import static com.facebook.presto.operator.scalar.QuantileDigestFunctions.DEFAULT_WEIGHT;
-import static com.facebook.presto.operator.scalar.QuantileDigestFunctions.verifyAccuracy;
-import static com.facebook.presto.operator.scalar.QuantileDigestFunctions.verifyWeight;
+import static com.facebook.presto.operator.scalar.TDigestFunctions.DEFAULT_COMPRESSION;
 import static com.facebook.presto.spi.function.Signature.comparableTypeParameter;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.lang.invoke.MethodHandles.insertArguments;
 
-public final class QuantileDigestAggregationFunction
+public abstract class AbstractStatisticalDigestAggregationFunction
         extends SqlAggregationFunction
 {
-    public static final QuantileDigestAggregationFunction QDIGEST_AGG = new QuantileDigestAggregationFunction(parseTypeSignature("V"));
-    public static final QuantileDigestAggregationFunction QDIGEST_AGG_WITH_WEIGHT = new QuantileDigestAggregationFunction(parseTypeSignature("V"), parseTypeSignature(StandardTypes.BIGINT));
-    public static final QuantileDigestAggregationFunction QDIGEST_AGG_WITH_WEIGHT_AND_ERROR = new QuantileDigestAggregationFunction(parseTypeSignature("V"), parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.DOUBLE));
-    public static final String NAME = "qdigest_agg";
+    private final String name;
+    private final String type;
+    private final boolean tdigest;
 
-    private static final MethodHandle INPUT_DOUBLE = methodHandle(QuantileDigestAggregationFunction.class, "inputDouble", QuantileDigestState.class, double.class, long.class, double.class);
-    private static final MethodHandle INPUT_REAL = methodHandle(QuantileDigestAggregationFunction.class, "inputReal", QuantileDigestState.class, long.class, long.class, double.class);
-    private static final MethodHandle INPUT_BIGINT = methodHandle(QuantileDigestAggregationFunction.class, "inputBigint", QuantileDigestState.class, long.class, long.class, double.class);
-    private static final MethodHandle COMBINE_FUNCTION = methodHandle(QuantileDigestAggregationFunction.class, "combineState", QuantileDigestState.class, QuantileDigestState.class);
-    private static final MethodHandle OUTPUT_FUNCTION = methodHandle(QuantileDigestAggregationFunction.class, "evaluateFinal", QuantileDigestStateSerializer.class, QuantileDigestState.class, BlockBuilder.class);
+    private static final MethodHandle INPUT_DOUBLE_T = methodHandle(TDigestAggregationFunction.class, "inputDouble", StatisticalDigestState.class, double.class, long.class, double.class);
+    private static final MethodHandle INPUT_DOUBLE_Q = methodHandle(dummieclass.class, "inputDouble", StatisticalDigestState.class, double.class, long.class, double.class);
+    private static final MethodHandle INPUT_REAL = methodHandle(dummieclass.class, "inputReal", StatisticalDigestState.class, long.class, long.class, double.class);
+    private static final MethodHandle INPUT_BIGINT = methodHandle(dummieclass.class, "inputBigint", StatisticalDigestState.class, long.class, long.class, double.class);
+    private static final MethodHandle COMBINE_FUNCTION = methodHandle(dummieclass.class, "combineState", StatisticalDigestState.class, StatisticalDigestState.class);
+    private static final MethodHandle OUTPUT_FUNCTION = methodHandle(dummieclass.class, "evaluateFinal", StatisticalDigestStateSerializer.class, StatisticalDigestState.class, BlockBuilder.class);
 
-    private QuantileDigestAggregationFunction(TypeSignature... typeSignatures)
+    protected AbstractStatisticalDigestAggregationFunction(String name, String type, boolean tdigest, TypeSignature... typeSignatures)
     {
         super(
-                NAME,
+                name,
                 ImmutableList.of(comparableTypeParameter("V")),
                 ImmutableList.of(),
-                parseTypeSignature("qdigest(V)"),
+                parseTypeSignature(type + "(V)"),
                 ImmutableList.copyOf(typeSignatures));
+        this.name = name;
+        this.type = type;
+        this.tdigest = tdigest;
     }
 
     @Override
     public String getDescription()
     {
-        return "Returns a qdigest from the set of reals, bigints or doubles";
+        return "Returns a digest from the set of reals, bigints or doubles";
     }
 
     @Override
     public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionManager functionManager)
     {
         Type valueType = boundVariables.getTypeVariable("V");
-        QuantileDigestType outputType = (QuantileDigestType) typeManager.getParameterizedType(
-                StandardTypes.QDIGEST,
+        Type outputType = (Type) typeManager.getParameterizedType(
+                type,
                 ImmutableList.of(TypeSignatureParameter.of(valueType.getTypeSignature())));
-        return generateAggregation(valueType, outputType, arity);
+        return generateAggregation(name, valueType, outputType, arity);
     }
 
-    private static InternalAggregationFunction generateAggregation(Type valueType, QuantileDigestType outputType, int arity)
+    private InternalAggregationFunction generateAggregation(String name, Type valueType, Type outputType, int arity)
     {
-        DynamicClassLoader classLoader = new DynamicClassLoader(QuantileDigestAggregationFunction.class.getClassLoader());
+        DynamicClassLoader classLoader = new DynamicClassLoader(dummieclass.class.getClassLoader());
         List<Type> inputTypes = getInputTypes(valueType, arity);
-        QuantileDigestStateSerializer stateSerializer = new QuantileDigestStateSerializer();
+        StatisticalDigestStateSerializer stateSerializer = new StatisticalDigestStateSerializer();
         Type intermediateType = stateSerializer.getSerializedType();
+        StatisticalDigestStateFactory statisticalFactory;
+        if (tdigest) {
+            statisticalFactory = StatisticalDigestStateFactory.createTDigestFactory();
+        }
+        else {
+            statisticalFactory = StatisticalDigestStateFactory.createQuantileDigestFactory();
+        }
 
         AggregationMetadata metadata = new AggregationMetadata(
-                generateAggregationName(NAME, outputType.getTypeSignature(), inputTypes.stream().map(Type::getTypeSignature).collect(toImmutableList())),
+                generateAggregationName(name, outputType.getTypeSignature(), inputTypes.stream().map(Type::getTypeSignature).collect(toImmutableList())),
                 createInputParameterMetadata(inputTypes),
                 getMethodHandle(valueType, arity),
                 COMBINE_FUNCTION,
                 OUTPUT_FUNCTION.bindTo(stateSerializer),
                 ImmutableList.of(new AccumulatorStateDescriptor(
-                        QuantileDigestState.class,
+                        StatisticalDigestState.class,
                         stateSerializer,
-                        new QuantileDigestStateFactory())),
+                        statisticalFactory)),
                 outputType);
 
         GenericAccumulatorFactoryBinder factory = AccumulatorCompiler.generateAccumulatorFactoryBinder(metadata, classLoader);
-        return new InternalAggregationFunction(NAME, inputTypes, ImmutableList.of(intermediateType), outputType, true, true, factory);
+        return new InternalAggregationFunction(name, inputTypes, ImmutableList.of(intermediateType), outputType, true, true, factory);
     }
 
     private static List<Type> getInputTypes(Type valueType, int arity)
@@ -135,17 +140,28 @@ public final class QuantileDigestAggregationFunction
         }
     }
 
-    private static MethodHandle getMethodHandle(Type valueType, int arity)
+    private MethodHandle getMethodHandle(Type valueType, int arity)
     {
         final MethodHandle inputFunction;
         switch (valueType.getDisplayName()) {
             case StandardTypes.DOUBLE:
-                inputFunction = INPUT_DOUBLE;
+                if (tdigest) {
+                    inputFunction = INPUT_DOUBLE_T;
+                }
+                else {
+                    inputFunction = INPUT_DOUBLE_Q;
+                }
                 break;
             case StandardTypes.REAL:
+                if (tdigest) {
+                    throw new UnsupportedOperationException();
+                }
                 inputFunction = INPUT_REAL;
                 break;
             case StandardTypes.BIGINT:
+                if (tdigest) {
+                    throw new UnsupportedOperationException();
+                }
                 inputFunction = INPUT_BIGINT;
                 break;
             default:
@@ -155,9 +171,15 @@ public final class QuantileDigestAggregationFunction
         switch (arity) {
             case 1:
                 // weight and accuracy unspecified
+                if (tdigest) {
+                    return insertArguments(inputFunction, 2, DEFAULT_WEIGHT, DEFAULT_COMPRESSION);
+                }
                 return insertArguments(inputFunction, 2, DEFAULT_WEIGHT, DEFAULT_ACCURACY);
             case 2:
                 // weight specified, accuracy unspecified
+                if (tdigest) {
+                    return insertArguments(inputFunction, 3, DEFAULT_COMPRESSION);
+                }
                 return insertArguments(inputFunction, 3, DEFAULT_ACCURACY);
             case 3:
                 // weight and accuracy specified
@@ -175,42 +197,13 @@ public final class QuantileDigestAggregationFunction
                 .build();
     }
 
-    public static void inputDouble(QuantileDigestState state, double value, long weight, double accuracy)
+    public static void combineState(StatisticalDigestState state, StatisticalDigestState otherState)
     {
-        inputBigint(state, doubleToSortableLong(value), weight, accuracy);
-    }
+        StatisticalDigest input = otherState.getStatisticalDigest();
 
-    public static void inputReal(QuantileDigestState state, long value, long weight, double accuracy)
-    {
-        inputBigint(state, floatToSortableInt(intBitsToFloat((int) value)), weight, accuracy);
-    }
-
-    public static void inputBigint(QuantileDigestState state, long value, long weight, double accuracy)
-    {
-        QuantileDigest qdigest = getOrCreateQuantileDigest(state, verifyAccuracy(accuracy));
-        state.addMemoryUsage(-qdigest.estimatedInMemorySizeInBytes());
-        qdigest.add(value, verifyWeight(weight));
-        state.addMemoryUsage(qdigest.estimatedInMemorySizeInBytes());
-    }
-
-    private static QuantileDigest getOrCreateQuantileDigest(QuantileDigestState state, double accuracy)
-    {
-        QuantileDigest qdigest = state.getQuantileDigest();
-        if (qdigest == null) {
-            qdigest = new QuantileDigest(accuracy);
-            state.setQuantileDigest(qdigest);
-            state.addMemoryUsage(qdigest.estimatedInMemorySizeInBytes());
-        }
-        return qdigest;
-    }
-
-    public static void combineState(QuantileDigestState state, QuantileDigestState otherState)
-    {
-        QuantileDigest input = otherState.getQuantileDigest();
-
-        QuantileDigest previous = state.getQuantileDigest();
+        StatisticalDigest previous = state.getStatisticalDigest();
         if (previous == null) {
-            state.setQuantileDigest(input);
+            state.setStatisticalDigest(input);
             state.addMemoryUsage(input.estimatedInMemorySizeInBytes());
         }
         else {
@@ -220,7 +213,7 @@ public final class QuantileDigestAggregationFunction
         }
     }
 
-    public static void evaluateFinal(QuantileDigestStateSerializer serializer, QuantileDigestState state, BlockBuilder out)
+    public static void evaluateFinal(StatisticalDigestStateSerializer serializer, StatisticalDigestState state, BlockBuilder out)
     {
         serializer.serialize(state, out);
     }
