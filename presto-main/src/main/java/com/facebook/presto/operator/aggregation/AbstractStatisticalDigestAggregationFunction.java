@@ -58,11 +58,11 @@ public abstract class AbstractStatisticalDigestAggregationFunction
     private final boolean tdigest;
 
     private static final MethodHandle INPUT_DOUBLE_T = methodHandle(TDigestAggregationFunction.class, "inputDouble", StatisticalDigestState.class, double.class, long.class, double.class);
-    private static final MethodHandle INPUT_DOUBLE_Q = methodHandle(dummieclass.class, "inputDouble", StatisticalDigestState.class, double.class, long.class, double.class);
-    private static final MethodHandle INPUT_REAL = methodHandle(dummieclass.class, "inputReal", StatisticalDigestState.class, long.class, long.class, double.class);
-    private static final MethodHandle INPUT_BIGINT = methodHandle(dummieclass.class, "inputBigint", StatisticalDigestState.class, long.class, long.class, double.class);
-    private static final MethodHandle COMBINE_FUNCTION = methodHandle(dummieclass.class, "combineState", StatisticalDigestState.class, StatisticalDigestState.class);
-    private static final MethodHandle OUTPUT_FUNCTION = methodHandle(dummieclass.class, "evaluateFinal", StatisticalDigestStateSerializer.class, StatisticalDigestState.class, BlockBuilder.class);
+    private static final MethodHandle INPUT_DOUBLE_Q = methodHandle(QuantileDigestAggregationFunction.class, "inputDouble", StatisticalDigestState.class, double.class, long.class, double.class);
+    private static final MethodHandle INPUT_REAL = methodHandle(QuantileDigestAggregationFunction.class, "inputReal", StatisticalDigestState.class, long.class, long.class, double.class);
+    private static final MethodHandle INPUT_BIGINT = methodHandle(QuantileDigestAggregationFunction.class, "inputBigint", StatisticalDigestState.class, long.class, long.class, double.class);
+    private static final MethodHandle COMBINE_FUNCTION = methodHandle(QuantileDigestAggregationFunction.class, "combineState", StatisticalDigestState.class, StatisticalDigestState.class);
+    private static final MethodHandle OUTPUT_FUNCTION = methodHandle(QuantileDigestAggregationFunction.class, "evaluateFinal", StatisticalDigestStateSerializer.class, StatisticalDigestState.class, BlockBuilder.class);
 
     protected AbstractStatisticalDigestAggregationFunction(String name, String type, boolean tdigest, TypeSignature... typeSignatures)
     {
@@ -95,7 +95,7 @@ public abstract class AbstractStatisticalDigestAggregationFunction
 
     private InternalAggregationFunction generateAggregation(String name, Type valueType, Type outputType, int arity)
     {
-        DynamicClassLoader classLoader = new DynamicClassLoader(dummieclass.class.getClassLoader());
+        DynamicClassLoader classLoader = new DynamicClassLoader(QuantileDigestAggregationFunction.class.getClassLoader());
         List<Type> inputTypes = getInputTypes(valueType, arity);
         StatisticalDigestStateSerializer stateSerializer = new StatisticalDigestStateSerializer();
         Type intermediateType = stateSerializer.getSerializedType();
