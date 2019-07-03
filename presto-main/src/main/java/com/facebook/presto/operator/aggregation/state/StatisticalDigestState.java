@@ -13,15 +13,18 @@
  */
 package com.facebook.presto.operator.aggregation.state;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.spi.function.AccumulatorState;
-import io.airlift.stats.QuantileDigest;
+import io.airlift.slice.Slice;
 
-public interface QuantileDigestState
+public interface StatisticalDigestState<T>
         extends AccumulatorState
 {
-    QuantileDigest getQuantileDigest();
+    StatisticalDigest<T> getStatisticalDigest();
 
-    void setQuantileDigest(QuantileDigest value);
+    void setStatisticalDigest(StatisticalDigest<T> value);
 
-    void addMemoryUsage(int value);
+    void addMemoryUsage(long value);
+
+    StatisticalDigest<T> deserialize(Slice slice);
 }
