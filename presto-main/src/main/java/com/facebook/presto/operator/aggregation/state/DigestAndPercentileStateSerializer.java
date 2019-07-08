@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation.state;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.function.AccumulatorStateSerializer;
@@ -64,7 +65,7 @@ public class DigestAndPercentileStateSerializer
 
         // read digest
         int length = input.readInt();
-        QuantileDigest digest = new QuantileDigest(input.readSlice(length));
+        StatisticalDigest digest = state.deserialize((input.readSlice(length)));
         state.setDigest(digest);
         state.addMemoryUsage(state.getDigest().estimatedInMemorySizeInBytes());
     }

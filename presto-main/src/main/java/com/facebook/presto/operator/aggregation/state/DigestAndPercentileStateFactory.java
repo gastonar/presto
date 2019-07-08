@@ -13,21 +13,46 @@
  */
 package com.facebook.presto.operator.aggregation.state;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.array.DoubleBigArray;
 import com.facebook.presto.array.ObjectBigArray;
 import com.facebook.presto.spi.function.AccumulatorStateFactory;
+import com.facebook.presto.tdigest.TDigest;
+import com.facebook.presto.type.StatisticalQuantileDigest;
+import com.facebook.presto.type.StatisticalTDigest;
+import io.airlift.slice.Slice;
 import io.airlift.stats.QuantileDigest;
 import org.openjdk.jol.info.ClassLayout;
 
+import java.util.function.Function;
+
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
 import static java.util.Objects.requireNonNull;
 
-public class DigestAndPercentileStateFactory
+public class DigestAndPercentileStateFactory<T>
         implements AccumulatorStateFactory<DigestAndPercentileState>
 {
+    private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+    public static DigestAndPercentileStateFactory<TDigest> createTDigestAndPercentileArrayStateFactory()
+    {
+        return new DigestAndPercentileStateFactory<TDigest>((slice) -> new StatisticalTDigest(createTDigest(slice)));
+    }
+
+    public static DigestAndPercentileStateFactory<QuantileDigest> createQuantileDigestAndPercentileArrayStateFactory()
+    {
+        return new DigestAndPercentileStateFactory<QuantileDigest>((slice) -> new StatisticalQuantileDigest(new QuantileDigest(slice)));
+    }
+
+    private DigestAndPercentileStateFactory(Function<Slice, StatisticalDigest<T>> deserializer)
+    {
+        this.deserializer = deserializer;
+    }
+
     @Override
     public DigestAndPercentileState createSingleState()
     {
-        return new SingleDigestAndPercentileState();
+        return new SingleDigestAndPercentileState(deserializer);
     }
 
     @Override
@@ -39,7 +64,7 @@ public class DigestAndPercentileStateFactory
     @Override
     public DigestAndPercentileState createGroupedState()
     {
-        return new GroupedDigestAndPercentileState();
+        return new GroupedDigestAndPercentileState(deserializer);
     }
 
     @Override
@@ -48,14 +73,20 @@ public class DigestAndPercentileStateFactory
         return GroupedDigestAndPercentileState.class;
     }
 
-    public static class GroupedDigestAndPercentileState
+    public static class GroupedDigestAndPercentileState<T>
             extends AbstractGroupedAccumulatorState
             implements DigestAndPercentileState
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupedDigestAndPercentileState.class).instanceSize();
-        private final ObjectBigArray<QuantileDigest> digests = new ObjectBigArray<>();
+        private final ObjectBigArray<StatisticalDigest<T>> digests = new ObjectBigArray<>();
         private final DoubleBigArray percentiles = new DoubleBigArray();
         private long size;
+        private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+        public GroupedDigestAndPercentileState(Function<Slice, StatisticalDigest<T>> deserializer)
+        {
+            this.deserializer = deserializer;
+        }
 
         @Override
         public void ensureCapacity(long size)
@@ -65,13 +96,13 @@ public class DigestAndPercentileStateFactory
         }
 
         @Override
-        public QuantileDigest getDigest()
+        public StatisticalDigest getDigest()
         {
             return digests.get(getGroupId());
         }
 
         @Override
-        public void setDigest(QuantileDigest digest)
+        public void setDigest(StatisticalDigest digest)
         {
             requireNonNull(digest, "value is null");
             digests.set(getGroupId(), digest);
@@ -90,9 +121,15 @@ public class DigestAndPercentileStateFactory
         }
 
         @Override
-        public void addMemoryUsage(int value)
+        public void addMemoryUsage(long value)
         {
             size += value;
+        }
+
+        @Override
+        public StatisticalDigest deserialize(Slice slice)
+        {
+            return deserializer.apply(slice);
         }
 
         @Override
@@ -102,21 +139,27 @@ public class DigestAndPercentileStateFactory
         }
     }
 
-    public static class SingleDigestAndPercentileState
+    public static class SingleDigestAndPercentileState<T>
             implements DigestAndPercentileState
     {
         public static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleDigestAndPercentileState.class).instanceSize();
-        private QuantileDigest digest;
+        private StatisticalDigest<T> digest;
         private double percentile;
+        private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+        public SingleDigestAndPercentileState(Function<Slice, StatisticalDigest<T>> deserializer)
+        {
+            this.deserializer = deserializer;
+        }
 
         @Override
-        public QuantileDigest getDigest()
+        public StatisticalDigest getDigest()
         {
             return digest;
         }
 
         @Override
-        public void setDigest(QuantileDigest digest)
+        public void setDigest(StatisticalDigest digest)
         {
             this.digest = digest;
         }
@@ -134,9 +177,15 @@ public class DigestAndPercentileStateFactory
         }
 
         @Override
-        public void addMemoryUsage(int value)
+        public void addMemoryUsage(long value)
         {
             // noop
+        }
+
+        @Override
+        public StatisticalDigest deserialize(Slice slice)
+        {
+            return deserializer.apply(slice);
         }
 
         @Override

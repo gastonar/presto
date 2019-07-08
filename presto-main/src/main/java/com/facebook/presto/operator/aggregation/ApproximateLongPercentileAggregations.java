@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.operator.aggregation.state.DigestAndPercentileState;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.function.AggregationFunction;
@@ -22,8 +23,10 @@ import com.facebook.presto.spi.function.InputFunction;
 import com.facebook.presto.spi.function.OutputFunction;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.type.StatisticalQuantileDigest;
 import io.airlift.stats.QuantileDigest;
 
+import static com.facebook.presto.operator.aggregation.FloatingPointBitsConverterUtil.doubleToSortableLong;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.util.Failures.checkCondition;
@@ -37,10 +40,10 @@ public final class ApproximateLongPercentileAggregations
     @InputFunction
     public static void input(@AggregationState DigestAndPercentileState state, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.DOUBLE) double percentile)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
 
         if (digest == null) {
-            digest = new QuantileDigest(0.01);
+            digest = new StatisticalQuantileDigest(new QuantileDigest(0.01));
             state.setDigest(digest);
             state.addMemoryUsage(digest.estimatedInMemorySizeInBytes());
         }
@@ -58,10 +61,10 @@ public final class ApproximateLongPercentileAggregations
     {
         checkWeight(weight);
 
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
 
         if (digest == null) {
-            digest = new QuantileDigest(0.01);
+            digest = new StatisticalQuantileDigest(new QuantileDigest(0.01));
             state.setDigest(digest);
             state.addMemoryUsage(digest.estimatedInMemorySizeInBytes());
         }
@@ -79,11 +82,11 @@ public final class ApproximateLongPercentileAggregations
     {
         checkWeight(weight);
 
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
 
         if (digest == null) {
             if (accuracy > 0 && accuracy < 1) {
-                digest = new QuantileDigest(accuracy);
+                digest = new StatisticalQuantileDigest(new QuantileDigest(accuracy));
             }
             else {
                 throw new IllegalArgumentException("Percentile accuracy must be strictly between 0 and 1");
@@ -103,9 +106,9 @@ public final class ApproximateLongPercentileAggregations
     @CombineFunction
     public static void combine(@AggregationState DigestAndPercentileState state, DigestAndPercentileState otherState)
     {
-        QuantileDigest input = otherState.getDigest();
+        StatisticalDigest input = otherState.getDigest();
 
-        QuantileDigest previous = state.getDigest();
+        StatisticalDigest previous = state.getDigest();
         if (previous == null) {
             state.setDigest(input);
             state.addMemoryUsage(input.estimatedInMemorySizeInBytes());
@@ -121,7 +124,7 @@ public final class ApproximateLongPercentileAggregations
     @OutputFunction(StandardTypes.BIGINT)
     public static void output(@AggregationState DigestAndPercentileState state, BlockBuilder out)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         double percentile = state.getPercentile();
         if (digest == null || digest.getCount() == 0.0) {
             out.appendNull();
@@ -129,7 +132,7 @@ public final class ApproximateLongPercentileAggregations
         else {
             checkState(percentile != -1.0, "Percentile is missing");
             checkCondition(0 <= percentile && percentile <= 1, INVALID_FUNCTION_ARGUMENT, "Percentile must be between 0 and 1");
-            BIGINT.writeLong(out, digest.getQuantile(percentile));
+            BIGINT.writeLong(out, doubleToSortableLong(digest.getQuantile(percentile)));
         }
     }
 

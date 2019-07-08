@@ -13,23 +13,47 @@
  */
 package com.facebook.presto.operator.aggregation.state;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.array.ObjectBigArray;
 import com.facebook.presto.spi.function.AccumulatorStateFactory;
-import io.airlift.slice.SizeOf;
+import com.facebook.presto.tdigest.TDigest;
+import com.facebook.presto.type.StatisticalQuantileDigest;
+import com.facebook.presto.type.StatisticalTDigest;
+import io.airlift.slice.Slice;
 import io.airlift.stats.QuantileDigest;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
+import java.util.function.Function;
 
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
+import static io.airlift.slice.SizeOf.sizeOfDoubleArray;
 import static java.util.Objects.requireNonNull;
 
-public class DigestAndPercentileArrayStateFactory
+public class DigestAndPercentileArrayStateFactory<T>
         implements AccumulatorStateFactory<DigestAndPercentileArrayState>
 {
+    private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+    public static DigestAndPercentileArrayStateFactory<TDigest> createTDigestAndPercentileArrayStateFactory()
+    {
+        return new DigestAndPercentileArrayStateFactory<TDigest>((slice) -> new StatisticalTDigest(createTDigest(slice)));
+    }
+
+    public static DigestAndPercentileArrayStateFactory<QuantileDigest> createQuantileDigestAndPercentileArrayStateFactory()
+    {
+        return new DigestAndPercentileArrayStateFactory<QuantileDigest>((slice) -> new StatisticalQuantileDigest(new QuantileDigest(slice)));
+    }
+
+    private DigestAndPercentileArrayStateFactory(Function<Slice, StatisticalDigest<T>> deserializer)
+    {
+        this.deserializer = deserializer;
+    }
+
     @Override
     public DigestAndPercentileArrayState createSingleState()
     {
-        return new SingleDigestAndPercentileArrayState();
+        return new SingleDigestAndPercentileArrayState(deserializer);
     }
 
     @Override
@@ -41,7 +65,7 @@ public class DigestAndPercentileArrayStateFactory
     @Override
     public DigestAndPercentileArrayState createGroupedState()
     {
-        return new GroupedDigestAndPercentileArrayState();
+        return new GroupedDigestAndPercentileArrayState(deserializer);
     }
 
     @Override
@@ -50,14 +74,20 @@ public class DigestAndPercentileArrayStateFactory
         return GroupedDigestAndPercentileArrayState.class;
     }
 
-    public static class GroupedDigestAndPercentileArrayState
+    public static class GroupedDigestAndPercentileArrayState<T>
             extends AbstractGroupedAccumulatorState
-            implements DigestAndPercentileArrayState
+            implements DigestAndPercentileArrayState<T>
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupedDigestAndPercentileArrayState.class).instanceSize();
-        private final ObjectBigArray<QuantileDigest> digests = new ObjectBigArray<>();
+        private final ObjectBigArray<StatisticalDigest<T>> digests = new ObjectBigArray<>();
         private final ObjectBigArray<List<Double>> percentilesArray = new ObjectBigArray<>();
         private long size;
+        private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+        public GroupedDigestAndPercentileArrayState(Function<Slice, StatisticalDigest<T>> deserializer)
+        {
+            this.deserializer = deserializer;
+        }
 
         @Override
         public void ensureCapacity(long size)
@@ -67,13 +97,13 @@ public class DigestAndPercentileArrayStateFactory
         }
 
         @Override
-        public QuantileDigest getDigest()
+        public StatisticalDigest getDigest()
         {
             return digests.get(getGroupId());
         }
 
         @Override
-        public void setDigest(QuantileDigest digest)
+        public void setDigest(StatisticalDigest digest)
         {
             digests.set(getGroupId(), requireNonNull(digest, "digest is null"));
         }
@@ -91,9 +121,15 @@ public class DigestAndPercentileArrayStateFactory
         }
 
         @Override
-        public void addMemoryUsage(int value)
+        public void addMemoryUsage(long value)
         {
             size += value;
+        }
+
+        @Override
+        public StatisticalDigest deserialize(Slice slice)
+        {
+            return deserializer.apply(slice);
         }
 
         @Override
@@ -103,21 +139,27 @@ public class DigestAndPercentileArrayStateFactory
         }
     }
 
-    public static class SingleDigestAndPercentileArrayState
-            implements DigestAndPercentileArrayState
+    public static class SingleDigestAndPercentileArrayState<T>
+            implements DigestAndPercentileArrayState<T>
     {
         public static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleDigestAndPercentileArrayState.class).instanceSize();
-        private QuantileDigest digest;
+        private StatisticalDigest<T> digest;
         private List<Double> percentiles;
+        private final Function<Slice, StatisticalDigest<T>> deserializer;
+
+        public SingleDigestAndPercentileArrayState(Function<Slice, StatisticalDigest<T>> deserializer)
+        {
+            this.deserializer = deserializer;
+        }
 
         @Override
-        public QuantileDigest getDigest()
+        public StatisticalDigest getDigest()
         {
             return digest;
         }
 
         @Override
-        public void setDigest(QuantileDigest digest)
+        public void setDigest(StatisticalDigest digest)
         {
             this.digest = requireNonNull(digest, "digest is null");
         }
@@ -135,9 +177,15 @@ public class DigestAndPercentileArrayStateFactory
         }
 
         @Override
-        public void addMemoryUsage(int value)
+        public void addMemoryUsage(long value)
         {
             // noop
+        }
+
+        @Override
+        public StatisticalDigest deserialize(Slice slice)
+        {
+            return deserializer.apply(slice);
         }
 
         @Override
@@ -148,7 +196,7 @@ public class DigestAndPercentileArrayStateFactory
                 estimatedSize += digest.estimatedInMemorySizeInBytes();
             }
             if (percentiles != null) {
-                estimatedSize += SizeOf.sizeOfDoubleArray(percentiles.size());
+                estimatedSize += sizeOfDoubleArray(percentiles.size());
             }
             return estimatedSize;
         }

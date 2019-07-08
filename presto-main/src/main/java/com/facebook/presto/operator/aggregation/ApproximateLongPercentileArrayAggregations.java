@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.operator.aggregation.state.DigestAndPercentileArrayState;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -23,11 +24,13 @@ import com.facebook.presto.spi.function.InputFunction;
 import com.facebook.presto.spi.function.OutputFunction;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.type.StatisticalQuantileDigest;
 import com.google.common.collect.ImmutableList;
 import io.airlift.stats.QuantileDigest;
 
 import java.util.List;
 
+import static com.facebook.presto.operator.aggregation.FloatingPointBitsConverterUtil.doubleToSortableLong;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
@@ -44,7 +47,7 @@ public final class ApproximateLongPercentileArrayAggregations
         initializePercentilesArray(state, percentilesArrayBlock);
         initializeDigest(state);
 
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         state.addMemoryUsage(-digest.estimatedInMemorySizeInBytes());
         digest.add(value);
         state.addMemoryUsage(digest.estimatedInMemorySizeInBytes());
@@ -56,7 +59,7 @@ public final class ApproximateLongPercentileArrayAggregations
         initializePercentilesArray(state, percentilesArrayBlock);
         initializeDigest(state);
 
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         state.addMemoryUsage(-digest.estimatedInMemorySizeInBytes());
         digest.add(value, weight);
         state.addMemoryUsage(digest.estimatedInMemorySizeInBytes());
@@ -65,8 +68,8 @@ public final class ApproximateLongPercentileArrayAggregations
     @CombineFunction
     public static void combine(@AggregationState DigestAndPercentileArrayState state, DigestAndPercentileArrayState otherState)
     {
-        QuantileDigest otherDigest = otherState.getDigest();
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest otherDigest = otherState.getDigest();
+        StatisticalDigest digest = state.getDigest();
 
         if (digest == null) {
             state.setDigest(otherDigest);
@@ -84,7 +87,7 @@ public final class ApproximateLongPercentileArrayAggregations
     @OutputFunction("array(bigint)")
     public static void output(@AggregationState DigestAndPercentileArrayState state, BlockBuilder out)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         List<Double> percentiles = state.getPercentiles();
 
         if (percentiles == null || digest == null) {
@@ -96,7 +99,7 @@ public final class ApproximateLongPercentileArrayAggregations
 
         for (int i = 0; i < percentiles.size(); i++) {
             Double percentile = percentiles.get(i);
-            BIGINT.writeLong(blockBuilder, digest.getQuantile(percentile));
+            BIGINT.writeLong(blockBuilder, doubleToSortableLong(digest.getQuantile(percentile)));
         }
 
         out.closeEntry();
@@ -120,9 +123,9 @@ public final class ApproximateLongPercentileArrayAggregations
 
     private static void initializeDigest(@AggregationState DigestAndPercentileArrayState state)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         if (digest == null) {
-            digest = new QuantileDigest(0.01);
+            digest = new StatisticalQuantileDigest(new QuantileDigest(0.01));
             state.setDigest(digest);
             state.addMemoryUsage(digest.estimatedInMemorySizeInBytes());
         }

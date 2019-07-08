@@ -85,7 +85,7 @@ public class DigestAndPercentileArrayStateSerializer
 
         // read digest
         int length = input.readInt();
-        state.setDigest(new QuantileDigest(input.readSlice(length)));
+        state.setDigest(state.deserialize(input.readSlice(length)));
         state.addMemoryUsage(state.getDigest().estimatedInMemorySizeInBytes());
     }
 }

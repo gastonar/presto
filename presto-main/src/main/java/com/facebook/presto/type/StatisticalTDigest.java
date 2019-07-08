@@ -17,6 +17,8 @@ import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.tdigest.TDigest;
 import io.airlift.slice.Slice;
 
+import static com.facebook.presto.operator.aggregation.FloatingPointBitsConverterUtil.sortableLongToDouble;
+
 public class StatisticalTDigest
         implements StatisticalDigest<TDigest>
 {
@@ -41,6 +43,12 @@ public class StatisticalTDigest
     }
 
     @Override
+    public double getCount()
+    {
+        return tDigest.getSize();
+    }
+
+    @Override
     public long estimatedInMemorySizeInBytes()
     {
         return tDigest.estimatedInMemorySizeInBytes();
@@ -62,5 +70,11 @@ public class StatisticalTDigest
     public StatisticalDigest getDigest()
     {
         return new StatisticalTDigest(tDigest);
+    }
+
+    @Override
+    public double getQuantile(double quantile)
+    {
+        return tDigest.getQuantile(quantile);
     }
 }

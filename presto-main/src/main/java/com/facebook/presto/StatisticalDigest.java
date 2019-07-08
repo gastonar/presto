@@ -17,6 +17,16 @@ import io.airlift.slice.Slice;
 
 public interface StatisticalDigest<T>
 {
+    default void add(double value)
+    {
+        add(value, 1);
+    }
+
+    default void add(long value)
+    {
+        add(value, 1);
+    }
+
     default void add(double value, long weight)
     {
         throw new UnsupportedOperationException("Cannot add a double to a q-digest");
@@ -27,7 +37,9 @@ public interface StatisticalDigest<T>
         throw new UnsupportedOperationException("Cannot add a long to a t-digest");
     }
 
-    void merge(StatisticalDigest<? extends StatisticalDigest> other);
+    void merge(StatisticalDigest<T> other);
+
+    double getCount();
 
     long estimatedInMemorySizeInBytes();
 
@@ -36,4 +48,6 @@ public interface StatisticalDigest<T>
     Slice serialize();
 
     StatisticalDigest<T> getDigest();
+
+    double getQuantile(double quantile);
 }

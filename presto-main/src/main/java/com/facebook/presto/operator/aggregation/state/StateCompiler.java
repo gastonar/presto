@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation.state;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.array.BlockBigArray;
 import com.facebook.presto.array.BooleanBigArray;
 import com.facebook.presto.array.ByteBigArray;

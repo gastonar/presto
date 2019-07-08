@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.operator.aggregation.state.DigestAndPercentileArrayState;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -59,7 +60,7 @@ public class ApproximateRealPercentileArrayAggregations
     @OutputFunction("array(real)")
     public static void output(@AggregationState DigestAndPercentileArrayState state, BlockBuilder out)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         List<Double> percentiles = state.getPercentiles();
 
         if (percentiles == null || digest == null) {

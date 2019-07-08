@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.StatisticalDigest;
 import com.facebook.presto.operator.aggregation.state.DigestAndPercentileArrayState;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -57,7 +58,7 @@ public final class ApproximateDoublePercentileArrayAggregations
     @OutputFunction("array(double)")
     public static void output(@AggregationState DigestAndPercentileArrayState state, BlockBuilder out)
     {
-        QuantileDigest digest = state.getDigest();
+        StatisticalDigest digest = state.getDigest();
         List<Double> percentiles = state.getPercentiles();
 
         if (percentiles == null || digest == null) {
@@ -69,7 +70,7 @@ public final class ApproximateDoublePercentileArrayAggregations
 
         for (int i = 0; i < percentiles.size(); i++) {
             Double percentile = percentiles.get(i);
-            DOUBLE.writeDouble(blockBuilder, sortableLongToDouble(digest.getQuantile(percentile)));
+            DOUBLE.writeDouble(blockBuilder, digest.getQuantile(percentile));
         }
 
         out.closeEntry();
