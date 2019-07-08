@@ -25,12 +25,12 @@ import io.airlift.slice.Slice;
 
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
 import static com.facebook.presto.util.Failures.checkCondition;
 
 public final class TDigestFunctions
 {
     public static final double DEFAULT_COMPRESSION = 100;
-    public static final long DEFAULT_WEIGHT = 1L;
 
     private TDigestFunctions() {}
 
@@ -39,7 +39,7 @@ public final class TDigestFunctions
     @SqlType(StandardTypes.DOUBLE)
     public static double valueAtQuantileDouble(@SqlType("tdigest(double)") Slice input, @SqlType(StandardTypes.DOUBLE) double quantile)
     {
-        return new TDigest(input).getQuantile(quantile);
+        return createTDigest(input).getQuantile(quantile);
     }
 
     @ScalarFunction("values_at_quantiles")
@@ -47,7 +47,7 @@ public final class TDigestFunctions
     @SqlType("array(double)")
     public static Block valuesAtQuantilesDouble(@SqlType("tdigest(double)") Slice input, @SqlType("array(double)") Block percentilesArrayBlock)
     {
-        TDigest tDigest = new TDigest(input);
+        TDigest tDigest = createTDigest(input);
         BlockBuilder output = DOUBLE.createBlockBuilder(null, percentilesArrayBlock.getPositionCount());
         for (int i = 0; i < percentilesArrayBlock.getPositionCount(); i++) {
             DOUBLE.writeDouble(output, tDigest.getQuantile(DOUBLE.getDouble(percentilesArrayBlock, i)));
@@ -61,7 +61,7 @@ public final class TDigestFunctions
     @SqlNullable
     public static Double quantileAtValueDouble(@SqlType("tdigest(double)") Slice input, @SqlType(StandardTypes.DOUBLE) double value)
     {
-        return new TDigest(input).getCdf(value);
+        return createTDigest(input).getCdf(value);
     }
 
     @ScalarFunction("quantiles_at_values")
@@ -70,7 +70,7 @@ public final class TDigestFunctions
     @SqlNullable
     public static Block quantilesAtValuesDouble(@SqlType("tdigest(double)") Slice input, @SqlType("array(double)") Block valuesArrayBlock)
     {
-        TDigest tDigest = new TDigest(input);
+        TDigest tDigest = createTDigest(input);
         BlockBuilder output = DOUBLE.createBlockBuilder(null, valuesArrayBlock.getPositionCount());
         for (int i = 0; i < valuesArrayBlock.getPositionCount(); i++) {
             DOUBLE.writeDouble(output, tDigest.getCdf(DOUBLE.getDouble(valuesArrayBlock, i)));

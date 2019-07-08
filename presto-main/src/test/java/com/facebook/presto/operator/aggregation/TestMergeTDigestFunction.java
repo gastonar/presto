@@ -29,6 +29,7 @@ import java.util.function.BiFunction;
 
 import static com.facebook.presto.operator.aggregation.AggregationTestUtils.assertAggregation;
 import static com.facebook.presto.spi.type.TDigestParametricType.TDIGEST;
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static java.util.Objects.requireNonNull;
 
@@ -42,8 +43,8 @@ public class TestMergeTDigestFunction
         requireNonNull(actualBinary, "actual value was null");
         requireNonNull(expectedBinary, "expected value was null");
 
-        TDigest actual = new TDigest(wrappedBuffer(((SqlVarbinary) actualBinary).getBytes()));
-        TDigest expected = new TDigest(wrappedBuffer(((SqlVarbinary) expectedBinary).getBytes()));
+        TDigest actual = createTDigest(wrappedBuffer(((SqlVarbinary) actualBinary).getBytes()));
+        TDigest expected = createTDigest(wrappedBuffer(((SqlVarbinary) expectedBinary).getBytes()));
         return actual.getSize() == expected.getSize() &&
                 actual.getMin() == expected.getMin() &&
                 actual.getMax() == expected.getMax() &&

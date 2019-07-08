@@ -26,6 +26,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.util.function.Function;
 
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
 import static java.util.Objects.requireNonNull;
 
 public class StatisticalDigestStateFactory<T>
@@ -35,7 +36,7 @@ public class StatisticalDigestStateFactory<T>
 
     public static StatisticalDigestStateFactory<TDigest> createTDigestFactory()
     {
-        return new StatisticalDigestStateFactory<TDigest>((slice) -> new StatisticalTDigest(new TDigest(slice)));
+        return new StatisticalDigestStateFactory<TDigest>((slice) -> new StatisticalTDigest(createTDigest(slice)));
     }
 
     public static StatisticalDigestStateFactory<QuantileDigest> createQuantileDigestFactory()

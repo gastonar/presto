@@ -22,6 +22,7 @@ import com.facebook.presto.tdigest.TDigest;
 import com.facebook.presto.type.StatisticalTDigest;
 
 import static com.facebook.presto.spi.type.StandardTypes.TDIGEST;
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
 
 public class MergeTDigestFunction
         extends AbstractMergeStatisticalDigestFunction
@@ -37,6 +38,6 @@ public class MergeTDigestFunction
     @InputFunction
     public static void input(Type type, StatisticalDigestState state, Block value, int index)
     {
-        merge(state, new StatisticalTDigest(new TDigest(type.getSlice(value, index))));
+        merge(state, new StatisticalTDigest(createTDigest(type.getSlice(value, index))));
     }
 }
