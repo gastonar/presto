@@ -153,36 +153,25 @@ public class TDigest
         activeCentroids = 0;
     }
 
-    public TDigest(Slice slice)
+    public static TDigest createTDigest(Slice slice)
     {
         SliceInput sliceInput = new BasicSliceInput(slice);
         byte format = sliceInput.readByte();
-        checkArgument(format == 0, "Invalid serialization format for TDigest");
+        checkArgument(format == 0, "Invalid serialization format for TDigest; expected '0'");
         byte type = sliceInput.readByte();
-        checkArgument(type == 0, "Invalid type for TDigest; expecting '0' (type double)");
-        this.min = sliceInput.readDouble();
-        this.max = sliceInput.readDouble();
-        this.publicCompression = max(10, sliceInput.readDouble());
-        // publicCompression is how many centroids the user asked for
-        // compression is how many we actually keep
-        this.compression = 2 * publicCompression;
-        this.totalWeight = sliceInput.readDouble();
-        this.activeCentroids = sliceInput.readInt();
-
-        // having a big buffer is good for speed
-        int bufferSize = 5 * (int) ceil(this.publicCompression + sizeFudge);
-        int size = (int) ceil(this.compression + sizeFudge);
-
-        this.weight = new double[size];
-        this.mean = new double[size];
-
-        this.tempWeight = new double[bufferSize];
-        this.tempMean = new double[bufferSize];
-        this.order = new int[bufferSize];
-
-        sliceInput.readBytes(wrappedDoubleArray(this.weight), this.activeCentroids * SIZE_OF_DOUBLE);
-        sliceInput.readBytes(wrappedDoubleArray(this.mean), this.activeCentroids * SIZE_OF_DOUBLE);
+        checkArgument(type == 0, "Invalid type for TDigest; expected '0' (type double)");
+        double min = sliceInput.readDouble();
+        double max = sliceInput.readDouble();
+        double publicCompression = max(10, sliceInput.readDouble());
+        TDigest r = new TDigest(publicCompression);
+        r.setMinMax(min, max);
+        r.totalWeight = sliceInput.readDouble();
+        r.activeCentroids = sliceInput.readInt();
+        sliceInput.readBytes(wrappedDoubleArray(r.weight), r.activeCentroids * SIZE_OF_DOUBLE);
+        sliceInput.readBytes(wrappedDoubleArray(r.mean), r.activeCentroids * SIZE_OF_DOUBLE);
         sliceInput.close();
+
+        return r;
     }
 
     public void add(double x)

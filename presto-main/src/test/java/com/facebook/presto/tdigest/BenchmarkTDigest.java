@@ -53,6 +53,8 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import static com.facebook.presto.tdigest.TDigest.createTDigest;
+
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(3)
 @Warmup(iterations = 5)
@@ -173,7 +175,7 @@ public class BenchmarkTDigest
     @Benchmark @BenchmarkMode(Mode.AverageTime)
     public TDigest benchmarkMergeT(Digest data)
     {
-        TDigest merged = new TDigest(data.digest1.serialize());
+        TDigest merged = createTDigest(data.digest1.serialize());
         merged.merge(data.digest2);
         return merged;
     }
@@ -182,7 +184,7 @@ public class BenchmarkTDigest
     @BenchmarkMode(Mode.AverageTime)
     public TDigest benchmarkDeserializeT(Digest data)
     {
-        return new TDigest(data.serializedDigest1);
+        return createTDigest(data.serializedDigest1);
     }
 
     @Benchmark
