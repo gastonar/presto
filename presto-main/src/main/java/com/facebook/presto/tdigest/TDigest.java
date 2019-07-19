@@ -31,6 +31,7 @@
 
 package com.facebook.presto.tdigest;
 
+import com.google.common.util.concurrent.AtomicDouble;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
@@ -224,6 +225,54 @@ public class TDigest
         for (Centroid centroid : tmp) {
             add(centroid.getMean(), centroid.getWeight());
         }
+    }
+
+    /**
+     * Get the approx truncated mean from the digest.
+     * The mean is computed as a weighted average of values between the upper and lower quantiles (inclusive)
+     * When the rank of a quantile is non-integer, a portion of the nearest rank's value is included in the mean
+     * according to its fraction within the quantile bound.
+     * <p>
+     * If the value in the digest needs to be converted before the mean is calculated,
+     * valueFunction can be used. Else, pass in the identity function.
+     */
+    public Double getTruncatedMean(double lowerQuantile, double upperQuantile)
+    {
+        double sum = 0;
+        double count = 0;
+        double mean = 0;
+
+        compress();
+
+        if (totalWeight == 0 || lowerQuantile >= upperQuantile) {
+            return null;
+        }
+
+        AtomicDouble meanResult = new AtomicDouble();
+        double lowerRank = lowerQuantile * totalWeight;
+        double upperRank = upperQuantile * totalWeight;
+
+        for (int i = 0; i < activeCentroids; i++) {
+            double centroidWeight = weight[i];
+            sum += centroidWeight;
+
+            double amountOverLower = Math.max(sum - lowerRank, 0);
+            double amountOverUpper = Math.max(sum - upperRank, 0);
+
+            centroidWeight = Math.max(0, Math.min(Math.min(centroidWeight, amountOverLower), centroidWeight - amountOverUpper));
+
+            if (amountOverLower > 0) {
+                mean = weightedAverage(mean, count, this.mean[i], centroidWeight);
+                count += centroidWeight;
+            }
+
+            if (amountOverUpper > 0 || sum == totalWeight) {
+                meanResult.set(mean);
+                break;
+            }
+        }
+
+        return meanResult.get();
     }
 
     private void mergeNewValues()
